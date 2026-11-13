@@ -531,5 +531,245 @@ class TestSuggestGeoTargets(KeywordPlannerTestCase):
             keyword_planner.suggest_geo_targets(location_names=[])
 
 
+class TestNegativeMatching(unittest.TestCase):
+    """Test cases for the negative keyword matching rules."""
+
+    def test_rules(self):
+        tokens = keyword_planner._tokens
+        cases = [
+            ("homebridge", "BROAD", "homebridge z-wave", True),
+            ("wave z", "BROAD", "z-wave hub", True),
+            ("cheap", "BROAD", "cheapest z-wave hub", False),
+            ("z wave", "PHRASE", "best z-wave hub", True),
+            ("wave z", "PHRASE", "z-wave hub", False),
+            ("homekit", "EXACT", "z-wave homekit", False),
+            ("homekit", "EXACT", "HomeKit", True),
+            ("home assistant", "EXACT", "home assistant", True),
+        ]
+        for negative, match_type, query, blocks in cases:
+            with self.subTest(negative=negative, query=query):
+                self.assertEqual(
+                    keyword_planner._negative_blocks(
+                        tokens(negative), match_type, tokens(query)
+                    ),
+                    blocks,
+                )
+
+    def test_spelling_key_ignores_case_spaces_and_hyphens(self):
+        keys = {
+            keyword_planner._spelling_key(text)
+            for text in ["z wave hub", "Z-Wave Hub", "zwave hub"]
+        }
+        self.assertEqual(len(keys), 1)
+        self.assertNotEqual(
+            keyword_planner._spelling_key("hub for z wave"),
+            keyword_planner._spelling_key("z wave hub"),
+        )
+
+
+class TestCompareKeywordIdeas(KeywordPlannerTestCase):
+    """Test cases for compare_keyword_ideas."""
+
+    def row(self, **fields):
+        row = self.client.get_type("GoogleAdsRow")
+        for path, value in fields.items():
+            target = row
+            *parents, leaf = path.split("__")
+            for parent in parents:
+                target = getattr(target, parent)
+            setattr(target, leaf, value)
+        return row
+
+    def keyword_row(self, text, match_type, prefix="ad_group_criterion", **f):
+        match = self.client.enums.KeywordMatchTypeEnum[match_type]
+        return self.row(
+            **{
+                f"{prefix}__keyword__text": text,
+                f"{prefix}__keyword__match_type": match,
+            },
+            **f,
+        )
+
+    def stub_queries(self, responses):
+        self.queries = []
+
+        def search_stream(customer_id, query):
+            self.queries.append(query)
+            for marker, rows in responses.items():
+                if marker in query:
+                    batch = MagicMock()
+                    batch.results = rows
+                    return [batch]
+            return []
+
+        self.service.search_stream.side_effect = search_stream
+
+    def existing(self, text, match_type, ad_group_id, ad_group_name):
+        return self.keyword_row(
+            text,
+            match_type,
+            campaign__id=300,
+            campaign__name="Search ZWave",
+            ad_group__id=ad_group_id,
+            ad_group__name=ad_group_name,
+            ad_group_criterion__status=(
+                self.client.enums.AdGroupCriterionStatusEnum.ENABLED
+            ),
+        )
+
+    def test_ad_group_target(self):
+        shared = self.keyword_row(
+            "free", "BROAD", "shared_criterion", shared_set__name="Shared"
+        )
+        account = self.keyword_row(
+            "jobs", "BROAD", "shared_criterion", shared_set__name="Account"
+        )
+        self.stub_queries(
+            {
+                "FROM ad_group WHERE": [
+                    self.row(
+                        campaign__id=300,
+                        campaign__name="Search ZWave",
+                        ad_group__name="Z-Wave HomeKit",
+                    )
+                ],
+                "negative = FALSE": [
+                    self.existing("z wave homekit", "EXACT", 200, "HomeKit"),
+                    self.existing("z-wave hub", "EXACT", 201, "Hub"),
+                ],
+                "negative = TRUE AND ad_group_criterion.status": [
+                    self.keyword_row("homebridge", "BROAD")
+                ],
+                "FROM campaign_criterion": [
+                    self.keyword_row(
+                        "matter z wave", "PHRASE", "campaign_criterion"
+                    )
+                ],
+                "FROM campaign_shared_set": [self.row(shared_set__id=11)],
+                "FROM shared_set WHERE": [self.row(shared_set__id=12)],
+                "IN (11)": [shared],
+                "IN (12)": [account],
+            }
+        )
+
+        result = keyword_planner.compare_keyword_ideas(
+            customer_id="1",
+            keywords=[
+                "Z-Wave HomeKit",
+                "z wave hub",
+                "homebridge z-wave",
+                "free matter z wave bridge",
+                "z-wave alexa",
+                "z-wave alexa",
+            ],
+            ad_group_id=200,
+        )
+
+        self.assertEqual(
+            result["target"],
+            {
+                "campaign_id": "300",
+                "campaign_name": "Search ZWave",
+                "ad_group_id": "200",
+                "ad_group_name": "Z-Wave HomeKit",
+            },
+        )
+        self.assertEqual(
+            result["summary"], {"NEW": 2, "EXISTS": 1, "BLOCKED": 2}
+        )
+        by_keyword = {r["keyword"]: r for r in result["results"]}
+        self.assertEqual(by_keyword["Z-Wave HomeKit"]["status"], "EXISTS")
+        self.assertEqual(
+            by_keyword["Z-Wave HomeKit"]["in_target"][0]["text"],
+            "z wave homekit",
+        )
+        self.assertEqual(by_keyword["z wave hub"]["status"], "NEW")
+        self.assertEqual(
+            by_keyword["z wave hub"]["elsewhere"][0]["ad_group_name"], "Hub"
+        )
+        self.assertEqual(
+            by_keyword["homebridge z-wave"]["blocked_by"],
+            [
+                {
+                    "text": "homebridge",
+                    "match_type": "BROAD",
+                    "level": "AD_GROUP",
+                }
+            ],
+        )
+        self.assertEqual(
+            [
+                (n["text"], n["level"])
+                for n in by_keyword["free matter z wave bridge"]["blocked_by"]
+            ],
+            [("matter z wave", "CAMPAIGN"), ("free", "SHARED_LIST")],
+        )
+        self.assertEqual(
+            by_keyword["free matter z wave bridge"]["blocked_by"][1][
+                "list_name"
+            ],
+            "Shared",
+        )
+        self.assertEqual(by_keyword["z-wave alexa"]["status"], "NEW")
+        self.assertTrue(
+            any("WHERE ad_group.id = 200" in q for q in self.queries)
+        )
+        self.assertTrue(
+            any("WHERE campaign.id = 300" in q for q in self.queries)
+        )
+
+    def test_campaign_target_skips_ad_group_negatives(self):
+        self.stub_queries(
+            {
+                "FROM campaign WHERE": [
+                    self.row(campaign__id=300, campaign__name="Search ZWave")
+                ],
+                "negative = FALSE": [
+                    self.existing("z-wave hub", "EXACT", 201, "Hub"),
+                ],
+            }
+        )
+
+        result = keyword_planner.compare_keyword_ideas(
+            customer_id="1", keywords=["zwave hub"], campaign_id="300"
+        )
+
+        self.assertEqual(result["results"][0]["status"], "EXISTS")
+        self.assertFalse(
+            any("negative = TRUE AND ad_group" in q for q in self.queries)
+        )
+        self.assertFalse(any("shared_criterion" in q for q in self.queries))
+
+    def test_invalid_input(self):
+        cases = [
+            ({"keywords": [" "], "ad_group_id": "1"}, "'keywords'"),
+            ({"keywords": ["a"]}, "exactly one"),
+            (
+                {"keywords": ["a"], "ad_group_id": "1", "campaign_id": "2"},
+                "exactly one",
+            ),
+            ({"keywords": ["a"], "ad_group_id": "abc"}, "numeric ID"),
+            (
+                {"keywords": [str(i) for i in range(1001)], "campaign_id": "2"},
+                "at most 1000",
+            ),
+        ]
+        for kwargs, message in cases:
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaisesRegex(ToolError, message):
+                    keyword_planner.compare_keyword_ideas(
+                        customer_id="1", **kwargs
+                    )
+        self.service.search_stream.assert_not_called()
+
+    def test_missing_target(self):
+        self.stub_queries({})
+
+        with self.assertRaisesRegex(ToolError, "ad group 9 was not found"):
+            keyword_planner.compare_keyword_ideas(
+                customer_id="1", keywords=["a"], ad_group_id="9"
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

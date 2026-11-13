@@ -62,6 +62,7 @@ class TestToolsMounting(unittest.IsolatedAsyncioTestCase):
         self.assertIn("keyword_planner_forecast_keywords", tool_names)
         self.assertIn("keyword_planner_generate_ad_group_themes", tool_names)
         self.assertIn("keyword_planner_suggest_geo_targets", tool_names)
+        self.assertIn("keyword_planner_compare_keyword_ideas", tool_names)
 
     @patch("ads_mcp.config.ToolsConfig.load")
     async def test_mounting_disabled_namespaces(self, mock_load):

@@ -485,6 +485,96 @@
       "annotations": {
         "readOnlyHint": true
       },
+      "description": "Checks keyword ideas against the account before adding them to an ad group or campaign.\n\nGive exactly one target: `ad_group_id` or `campaign_id`. For each keyword\nit reports:\n- `in_target`: keywords in the target with the same words, ignoring case,\n  spaces and hyphens ('z wave hub' = 'z-wave hub' = 'zwave hub').\n- `elsewhere`: the same keyword in other ad groups or campaigns, e.g. a\n  Brand ad group that already covers it.\n- `blocked_by`: negative keywords that stop it from serving in the target:\n  ad group negatives (ad group target only), campaign negatives, shared\n  negative keyword lists linked to the campaign, and account-level\n  negative keyword lists.\n\nThe keyword text is treated as the search query: a broad negative blocks\nwhen all its words occur, a phrase negative when its words occur in\norder, and an exact negative only on the identical query. Negatives do not\nmatch close variants, so 'homebridge' blocks 'homebridge z-wave' but\n'homekit' (exact) does not block 'z-wave homekit'.\n\n`status` is BLOCKED (a negative blocks it), EXISTS (already in the target)\nor NEW.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "ad_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target ad group ID."
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target campaign ID (when no specific ad group is targeted)."
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Google Ads Customer ID (digits or hyphenated)."
+          },
+          "keywords": {
+            "description": "Keyword ideas to check (max 1000).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "login_customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional manager customer ID to use as the login-customer-id header."
+          }
+        },
+        "required": [
+          "customer_id",
+          "keywords"
+        ],
+        "type": "object"
+      },
+      "name": "keyword_planner_compare_keyword_ideas",
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Keyword Planner Compare Keyword Ideas"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      },
       "description": "Forecasts clicks, cost and conversions for a set of keywords (Keyword Planner).\n\nModels one new campaign with a single ad group; nothing is created in the\naccount. The forecast period must lie in the future and defaults to the\nnext 30 days.",
       "inputSchema": {
         "additionalProperties": false,

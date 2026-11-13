@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Read-only Keyword Planner tools: ideas, historical metrics, forecasts, themes and geo targets."""
+"""Read-only Keyword Planner tools: ideas, metrics, forecasts, themes, geo targets and account checks."""
 
 import datetime
 from enum import Enum
@@ -601,3 +601,296 @@ def suggest_geo_targets(
         }
         for s in response.geo_target_constant_suggestions
     ]
+
+
+MAX_COMPARE_KEYWORDS = 1000
+_TOKEN_SEPARATOR = re.compile(r"[^\w]+")
+
+
+def _tokens(text: str) -> tuple[str, ...]:
+    return tuple(t for t in _TOKEN_SEPARATOR.split(text.lower()) if t)
+
+
+def _spelling_key(text: str) -> str:
+    # Joining the tokens makes 'z wave', 'z-wave' and 'zwave' compare equal.
+    return "".join(_tokens(text))
+
+
+def _negative_blocks(
+    negative: tuple[str, ...], match_type: str, query: tuple[str, ...]
+) -> bool:
+    """Negative keywords, unlike positive ones, never match close variants."""
+    if not negative:
+        return False
+    if match_type == "EXACT":
+        return query == negative
+    if match_type == "PHRASE":
+        size = len(negative)
+        return any(
+            query[i : i + size] == negative
+            for i in range(len(query) - size + 1)
+        )
+    return set(negative) <= set(query)
+
+
+def _require_id(value: str | int, name: str) -> str:
+    text = str(value).strip()
+    if not text.isdigit():
+        raise ToolError(f"Error: '{name}' must be a numeric ID; got '{value}'.")
+    return text
+
+
+def _search_rows(service: Any, customer_id: str, query: str) -> list[Any]:
+    def _fetch() -> list[Any]:
+        return [
+            row
+            for batch in service.search_stream(
+                customer_id=customer_id, query=query
+            )
+            for row in batch.results
+        ]
+
+    return _call(_fetch, "query the account")
+
+
+def _keyword_negatives(
+    rows: Iterable[Any], criterion: str, level: str
+) -> list[dict[str, Any]]:
+    negatives = []
+    for row in rows:
+        keyword = getattr(row, criterion).keyword
+        entry: dict[str, Any] = {
+            "text": keyword.text,
+            "match_type": keyword.match_type.name,
+            "level": level,
+        }
+        if criterion == "shared_criterion":
+            entry["list_name"] = row.shared_set.name
+        negatives.append(entry)
+    return negatives
+
+
+def _shared_list_negatives(
+    service: Any, customer_id: str, list_query: str, level: str
+) -> list[dict[str, Any]]:
+    list_ids = sorted(
+        {
+            str(row.shared_set.id)
+            for row in _search_rows(service, customer_id, list_query)
+        }
+    )
+    if not list_ids:
+        return []
+    rows = _search_rows(
+        service,
+        customer_id,
+        "SELECT shared_set.name, shared_criterion.keyword.text, "
+        "shared_criterion.keyword.match_type FROM shared_criterion "
+        f"WHERE shared_set.id IN ({', '.join(list_ids)}) "
+        "AND shared_criterion.type = 'KEYWORD'",
+    )
+    return _keyword_negatives(rows, "shared_criterion", level)
+
+
+@keyword_planner_mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+def compare_keyword_ideas(
+    customer_id: str | int,
+    keywords: list[str],
+    ad_group_id: str | int | None = None,
+    campaign_id: str | int | None = None,
+    login_customer_id: str | int | None = None,
+) -> dict[str, Any]:
+    """Checks keyword ideas against the account before adding them to an ad group or campaign.
+
+    Give exactly one target: `ad_group_id` or `campaign_id`. For each keyword
+    it reports:
+    - `in_target`: keywords in the target with the same words, ignoring case,
+      spaces and hyphens ('z wave hub' = 'z-wave hub' = 'zwave hub').
+    - `elsewhere`: the same keyword in other ad groups or campaigns, e.g. a
+      Brand ad group that already covers it.
+    - `blocked_by`: negative keywords that stop it from serving in the target:
+      ad group negatives (ad group target only), campaign negatives, shared
+      negative keyword lists linked to the campaign, and account-level
+      negative keyword lists.
+
+    The keyword text is treated as the search query: a broad negative blocks
+    when all its words occur, a phrase negative when its words occur in
+    order, and an exact negative only on the identical query. Negatives do not
+    match close variants, so 'homebridge' blocks 'homebridge z-wave' but
+    'homekit' (exact) does not block 'z-wave homekit'.
+
+    `status` is BLOCKED (a negative blocks it), EXISTS (already in the target)
+    or NEW.
+
+    Args:
+        customer_id: Google Ads Customer ID (digits or hyphenated).
+        keywords: Keyword ideas to check (max 1000).
+        ad_group_id: Target ad group ID.
+        campaign_id: Target campaign ID (when no specific ad group is targeted).
+        login_customer_id: Optional manager customer ID to use as the login-customer-id header.
+
+    Returns:
+        `target`, `summary` (counts per status) and `results` per keyword.
+    """
+    cleaned_customer_id = _require_customer_id(customer_id)
+    texts = list(dict.fromkeys(k.strip() for k in keywords if k.strip()))
+    if not texts:
+        raise ToolError("Error: 'keywords' must not be empty.")
+    if len(texts) > MAX_COMPARE_KEYWORDS:
+        raise ToolError(
+            f"Error: at most {MAX_COMPARE_KEYWORDS} keywords are allowed; "
+            f"got {len(texts)}."
+        )
+    if (ad_group_id is None) == (campaign_id is None):
+        raise ToolError(
+            "Error: provide exactly one of 'ad_group_id' or 'campaign_id'."
+        )
+
+    client = utils.get_googleads_client(login_customer_id=login_customer_id)
+    service = utils.get_googleads_service_from_client(
+        client, "GoogleAdsService"
+    )
+
+    if ad_group_id is not None:
+        target_id = _require_id(ad_group_id, "ad_group_id")
+        rows = _search_rows(
+            service,
+            cleaned_customer_id,
+            "SELECT campaign.id, campaign.name, ad_group.id, ad_group.name "
+            f"FROM ad_group WHERE ad_group.id = {target_id}",
+        )
+        if not rows:
+            raise ToolError(f"Error: ad group {target_id} was not found.")
+        target = {
+            "campaign_id": str(rows[0].campaign.id),
+            "campaign_name": rows[0].campaign.name,
+            "ad_group_id": target_id,
+            "ad_group_name": rows[0].ad_group.name,
+        }
+    else:
+        target_id = _require_id(campaign_id, "campaign_id")
+        rows = _search_rows(
+            service,
+            cleaned_customer_id,
+            "SELECT campaign.id, campaign.name FROM campaign "
+            f"WHERE campaign.id = {target_id}",
+        )
+        if not rows:
+            raise ToolError(f"Error: campaign {target_id} was not found.")
+        target = {
+            "campaign_id": target_id,
+            "campaign_name": rows[0].campaign.name,
+        }
+    target_campaign_id = target["campaign_id"]
+
+    existing_rows = _search_rows(
+        service,
+        cleaned_customer_id,
+        "SELECT campaign.id, campaign.name, ad_group.id, ad_group.name, "
+        "ad_group_criterion.keyword.text, "
+        "ad_group_criterion.keyword.match_type, ad_group_criterion.status "
+        "FROM ad_group_criterion "
+        "WHERE ad_group_criterion.type = 'KEYWORD' "
+        "AND ad_group_criterion.negative = FALSE "
+        "AND ad_group_criterion.status != 'REMOVED' "
+        "AND ad_group.status != 'REMOVED' "
+        "AND campaign.status != 'REMOVED'",
+    )
+    existing_by_key: dict[str, list[dict[str, Any]]] = {}
+    for row in existing_rows:
+        keyword = row.ad_group_criterion.keyword
+        existing_by_key.setdefault(_spelling_key(keyword.text), []).append(
+            {
+                "text": keyword.text,
+                "match_type": keyword.match_type.name,
+                "status": row.ad_group_criterion.status.name,
+                "campaign_id": str(row.campaign.id),
+                "campaign_name": row.campaign.name,
+                "ad_group_id": str(row.ad_group.id),
+                "ad_group_name": row.ad_group.name,
+            }
+        )
+
+    negatives: list[dict[str, Any]] = []
+    if "ad_group_id" in target:
+        negatives += _keyword_negatives(
+            _search_rows(
+                service,
+                cleaned_customer_id,
+                "SELECT ad_group_criterion.keyword.text, "
+                "ad_group_criterion.keyword.match_type "
+                "FROM ad_group_criterion "
+                f"WHERE ad_group.id = {target['ad_group_id']} "
+                "AND ad_group_criterion.type = 'KEYWORD' "
+                "AND ad_group_criterion.negative = TRUE "
+                "AND ad_group_criterion.status != 'REMOVED'",
+            ),
+            "ad_group_criterion",
+            "AD_GROUP",
+        )
+    negatives += _keyword_negatives(
+        _search_rows(
+            service,
+            cleaned_customer_id,
+            "SELECT campaign_criterion.keyword.text, "
+            "campaign_criterion.keyword.match_type FROM campaign_criterion "
+            f"WHERE campaign.id = {target_campaign_id} "
+            "AND campaign_criterion.type = 'KEYWORD' "
+            "AND campaign_criterion.negative = TRUE "
+            "AND campaign_criterion.status != 'REMOVED'",
+        ),
+        "campaign_criterion",
+        "CAMPAIGN",
+    )
+    negatives += _shared_list_negatives(
+        service,
+        cleaned_customer_id,
+        "SELECT shared_set.id FROM campaign_shared_set "
+        f"WHERE campaign.id = {target_campaign_id} "
+        "AND campaign_shared_set.status = 'ENABLED' "
+        "AND shared_set.type = 'NEGATIVE_KEYWORDS' "
+        "AND shared_set.status = 'ENABLED'",
+        "SHARED_LIST",
+    )
+    negatives += _shared_list_negatives(
+        service,
+        cleaned_customer_id,
+        "SELECT shared_set.id FROM shared_set "
+        "WHERE shared_set.type = 'ACCOUNT_LEVEL_NEGATIVE_KEYWORDS' "
+        "AND shared_set.status = 'ENABLED'",
+        "ACCOUNT_LIST",
+    )
+    negative_tokens = [(_tokens(n["text"]), n) for n in negatives]
+
+    in_target_scope = (
+        "ad_group_id" if "ad_group_id" in target else "campaign_id"
+    )
+    results = []
+    for text in texts:
+        query = _tokens(text)
+        matches = existing_by_key.get(_spelling_key(text), [])
+        in_target = [
+            m for m in matches if m[in_target_scope] == target[in_target_scope]
+        ]
+        elsewhere = [m for m in matches if m not in in_target]
+        blocked_by = [
+            negative
+            for tokens, negative in negative_tokens
+            if _negative_blocks(tokens, negative["match_type"], query)
+        ]
+        status = "BLOCKED" if blocked_by else "EXISTS" if in_target else "NEW"
+        results.append(
+            {
+                "keyword": text,
+                "status": status,
+                "in_target": in_target,
+                "elsewhere": elsewhere,
+                "blocked_by": blocked_by,
+            }
+        )
+
+    summary = {
+        status: sum(1 for r in results if r["status"] == status)
+        for status in ("NEW", "EXISTS", "BLOCKED")
+    }
+    return {"target": target, "summary": summary, "results": results}
