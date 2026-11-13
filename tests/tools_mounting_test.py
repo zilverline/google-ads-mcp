@@ -37,6 +37,7 @@ class TestToolsMounting(unittest.IsolatedAsyncioTestCase):
                     "labels": True,
                     "assets": True,
                     "keyword_planner": True,
+                    "keywords": True,
                 }
             }
         )
@@ -63,6 +64,7 @@ class TestToolsMounting(unittest.IsolatedAsyncioTestCase):
         self.assertIn("keyword_planner_generate_ad_group_themes", tool_names)
         self.assertIn("keyword_planner_suggest_geo_targets", tool_names)
         self.assertIn("keyword_planner_compare_keyword_ideas", tool_names)
+        self.assertIn("keywords_manage_keywords", tool_names)
 
     @patch("ads_mcp.config.ToolsConfig.load")
     async def test_mounting_disabled_namespaces(self, mock_load):

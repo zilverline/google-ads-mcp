@@ -1185,6 +1185,183 @@
         "destructiveHint": true,
         "readOnlyHint": false
       },
+      "description": "Adds, pauses, enables, removes or re-matches keywords in one atomic request.\n\nScope: give exactly one of `ad_group_id` (keywords or, with\n`negative=True`, ad group negatives) or `campaign_id` (campaign negatives\nonly; requires `negative=True`, supports CREATE and REMOVE).\n\nActions per change:\n- CREATE: `text` and `match_type`.\n- PAUSE / ENABLE / REMOVE: `criterion_id` (the keyword's criterion ID).\n- CHANGE_MATCH_TYPE: `criterion_id` and the new `match_type`, optionally a\n  new spelling in `text`. Google Ads cannot change a keyword's match type\n  in place, so this creates the new keyword and pauses the old one.\n\nCheck ideas with `keyword_planner_compare_keyword_ideas` first: it shows\nkeywords that already exist or that negatives would block.\n\nPropose & Confirm Workflow (`validate_only` and `checksum`):\n1. Call `manage_keywords` with `validate_only=True` (the default). After validation passes, the tool returns structured `change_items` and a `checksum` without committing changes.\n2. Present the `change_items` to the user and wait for explicit user approval.\n3. Only after user confirmation, call `manage_keywords` with `validate_only=False` along with the exact same parameters and the `checksum` returned by the previous `validate_only=True` call.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "ad_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target ad group ID."
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target campaign ID, for campaign negatives."
+          },
+          "changes": {
+            "description": "The changes to apply, e.g. [{\"action\": \"CREATE\", \"text\": \"z-wave hub\", \"match_type\": \"EXACT\"}].",
+            "items": {
+              "description": "One keyword change.\n\nCREATE needs `text` and `match_type`. PAUSE, ENABLE and REMOVE need\n`criterion_id`. CHANGE_MATCH_TYPE needs `criterion_id` and the new\n`match_type`, and optionally a new spelling in `text`.",
+              "properties": {
+                "action": {
+                  "description": "Supported keyword changes.",
+                  "enum": [
+                    "CREATE",
+                    "PAUSE",
+                    "ENABLE",
+                    "REMOVE",
+                    "CHANGE_MATCH_TYPE"
+                  ],
+                  "type": "string"
+                },
+                "criterion_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "match_type": {
+                  "anyOf": [
+                    {
+                      "description": "Keyword match types.",
+                      "enum": [
+                        "EXACT",
+                        "PHRASE",
+                        "BROAD"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "text": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Checksum returned by a prior `validate_only=True` call. Required when `validate_only=False`."
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Google Ads Customer ID (digits or hyphenated)."
+          },
+          "login_customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional manager customer ID to use as the login-customer-id header."
+          },
+          "negative": {
+            "default": false,
+            "description": "True to manage negative keywords.",
+            "type": "boolean"
+          },
+          "validate_only": {
+            "default": true,
+            "description": "If True (default), validates and returns proposed `change_items` and a `checksum` without changing anything. If False, requires `checksum` from a prior `validate_only=True` call to commit.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "customer_id",
+          "changes"
+        ],
+        "type": "object"
+      },
+      "name": "keywords_manage_keywords",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "x-fastmcp-wrap-result": true
+      },
+      "title": "Keywords Manage Keywords"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
       "description": "Manages associations between labels and Campaign, Customer, Ad Group, or Ad Group Criterion.\n\nSupports CREATE and REMOVE operations.\n\nPropose & Confirm Workflow (`validate_only` and `checksum`):\n1. Call `manage_label_associations` with `validate_only=True` (the default). After validation passes, the tool returns structured `change_items` and a `checksum` without committing changes.\n2. Present the `change_items` to the user and wait for explicit user approval.\n3. Only after user confirmation, call `manage_label_associations` with `validate_only=False` along with the exact same parameters and the `checksum` returned by the previous `validate_only=True` call.",
       "inputSchema": {
         "additionalProperties": false,

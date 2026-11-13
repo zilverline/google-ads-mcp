@@ -35,6 +35,7 @@ ALL_CATEGORIES = [
     "labels",
     "assets",
     "keyword_planner",
+    "keywords",
 ]
 
 
