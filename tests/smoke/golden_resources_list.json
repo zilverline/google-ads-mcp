@@ -17,6 +17,39 @@
           "tags": []
         }
       },
+      "description": "Retrieve all countries with their geo target constant IDs.\n\nUse the `id` in `geo_target_ids`, e.g. 2528 Netherlands, 2056 Belgium,\n2276 Germany, 2840 United States. For regions and cities use the\n`keyword_planner_suggest_geo_targets` tool.\n\nReturns:\n    str: A JSON list of {id, country_code, name}.",
+      "mimeType": "application/json",
+      "name": "get_keyword_planner_countries",
+      "uri": "resource://keyword-planner/countries"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "description": "Retrieve the Keyword Planner usage guide.\n\nExplains the access level Keyword Planner needs, the recommended tool\nworkflow from keyword ideas to adding keywords, how to read search\nvolumes, bids and forecasts, and how negative keywords match.\n\nReturns:\n    str: The guide in Markdown format.",
+      "mimeType": "text/markdown",
+      "name": "get_keyword_planner_guide",
+      "uri": "resource://keyword-planner/guide"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "description": "Retrieve the targetable languages with their language constant IDs.\n\nUse the `id` as `language_id` / `language_ids` in the Keyword Planner\ntools, e.g. 1000 English, 1001 German, 1002 French, 1010 Dutch.\n\nReturns:\n    str: A JSON list of {id, code, name}.",
+      "mimeType": "application/json",
+      "name": "get_keyword_planner_languages",
+      "uri": "resource://keyword-planner/languages"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
       "description": "Retrieve the Google Ads API metrics documentation.\n\nProvides the official documentation for metrics in the Google Ads API,\nlisting all available metrics that can be queried to analyze performance\ndata.\n\nUse this resource to identify which metrics are available and how they are\ncalculated.\n\nReturns:\n    str: The metrics documentation in HTML format.",
       "mimeType": "text/html",
       "name": "get_metrics",
