@@ -483,6 +483,882 @@
         }
       },
       "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "Checks keyword ideas against the account before adding them to an ad group or campaign.\n\nGive exactly one target: `ad_group_id` or `campaign_id`. For each keyword\nit reports:\n- `in_target`: keywords in the target with the same words, ignoring case,\n  spaces and hyphens ('z wave hub' = 'z-wave hub' = 'zwave hub').\n- `elsewhere`: the same keyword in other ad groups or campaigns, e.g. a\n  Brand ad group that already covers it.\n- `blocked_by`: negative keywords that stop it from serving in the target:\n  ad group negatives (ad group target only), campaign negatives, shared\n  negative keyword lists linked to the campaign, and account-level\n  negative keyword lists.\n\nThe keyword text is treated as the search query: a broad negative blocks\nwhen all its words occur, a phrase negative when its words occur in\norder, and an exact negative only on the identical query. Negatives do not\nmatch close variants, so 'homebridge' blocks 'homebridge z-wave' but\n'homekit' (exact) does not block 'z-wave homekit'.\n\n`status` is BLOCKED (a negative blocks it), EXISTS (already in the target)\nor NEW.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "ad_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target ad group ID."
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target campaign ID (when no specific ad group is targeted)."
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Google Ads Customer ID (digits or hyphenated)."
+          },
+          "keywords": {
+            "description": "Keyword ideas to check (max 1000).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "login_customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional manager customer ID to use as the login-customer-id header."
+          }
+        },
+        "required": [
+          "customer_id",
+          "keywords"
+        ],
+        "type": "object"
+      },
+      "name": "keyword_planner_compare_keyword_ideas",
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Keyword Planner Compare Keyword Ideas"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "Forecasts clicks, cost and conversions for a set of keywords (Keyword Planner).\n\nModels one new campaign with a single ad group; nothing is created in the\naccount. The forecast period must lie in the future and defaults to the\nnext 30 days.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "bidding_strategy": {
+            "default": "MAXIMIZE_CLICKS",
+            "description": "MANUAL_CPC, MAXIMIZE_CLICKS (default) or MAXIMIZE_CONVERSIONS.",
+            "enum": [
+              "MANUAL_CPC",
+              "MAXIMIZE_CLICKS",
+              "MAXIMIZE_CONVERSIONS"
+            ],
+            "type": "string"
+          },
+          "currency_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ISO 4217 code for budget and results. Defaults to the account currency."
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Google Ads Customer ID (digits or hyphenated)."
+          },
+          "daily_budget": {
+            "description": "Daily budget in the account (or `currency_code`) currency.",
+            "type": "number"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Forecast end, YYYY-MM-DD. Defaults to 30 days after the start."
+          },
+          "geo_target_ids": {
+            "description": "Geo target constant IDs, e.g. ['2840'].",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "keywords": {
+            "description": "Keywords with match type, e.g. [{\"text\": \"z-wave hub\", \"match_type\": \"EXACT\"}].",
+            "items": {
+              "description": "A keyword to include in a forecast.",
+              "properties": {
+                "match_type": {
+                  "default": "EXACT",
+                  "description": "Keyword match types supported by forecasts.",
+                  "enum": [
+                    "EXACT",
+                    "PHRASE",
+                    "BROAD"
+                  ],
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "language_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Language constant IDs, e.g. ['1000']. Omit for all languages."
+          },
+          "login_customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional manager customer ID to use as the login-customer-id header."
+          },
+          "max_cpc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Max CPC bid; required for MANUAL_CPC, optional ceiling for MAXIMIZE_CLICKS."
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Forecast start, YYYY-MM-DD. Defaults to tomorrow."
+          }
+        },
+        "required": [
+          "customer_id",
+          "keywords",
+          "geo_target_ids",
+          "daily_budget"
+        ],
+        "type": "object"
+      },
+      "name": "keyword_planner_forecast_keywords",
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Keyword Planner Forecast Keywords"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "Suggests which existing ad group each keyword fits best (Keyword Planner).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "ad_group_ids": {
+            "description": "IDs of candidate ad groups in this account.",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Google Ads Customer ID (digits or hyphenated)."
+          },
+          "keywords": {
+            "description": "Keywords to place.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "login_customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional manager customer ID to use as the login-customer-id header."
+          }
+        },
+        "required": [
+          "customer_id",
+          "keywords",
+          "ad_group_ids"
+        ],
+        "type": "object"
+      },
+      "name": "keyword_planner_generate_ad_group_themes",
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Keyword Planner Generate Ad Group Themes"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "Generates keyword ideas with search volumes and bid ranges (Keyword Planner).\n\nSeed with `keywords` (max 20), a page `url`, both, or a whole `site`\n(domain, used on its own). Results are sorted by average monthly searches.\nVolumes are rounded buckets (minimum 10) for the given locations and\nlanguage; bids are in the account currency. Call once per market when\nmarkets use different languages. Word-order variants (e.g. 'z wave hub'\nand 'hub for z wave') often report the same shared volume; do not add\nthem up.\n\nUse `suggest_geo_targets` to find geo target IDs (e.g. Netherlands = 2528).\nLanguage IDs are language_constant IDs, e.g. 1000 English, 1001 German,\n1002 French, 1010 Dutch.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Google Ads Customer ID (digits or hyphenated)."
+          },
+          "geo_target_ids": {
+            "description": "Geo target constant IDs, e.g. ['2528', '2056'].",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "include_adult_keywords": {
+            "default": false,
+            "description": "Include adult keyword ideas.",
+            "type": "boolean"
+          },
+          "include_monthly_volumes": {
+            "default": false,
+            "description": "Include the monthly search volume breakdown per idea.",
+            "type": "boolean"
+          },
+          "include_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Case-insensitive regex an idea must match, e.g. 'z[ -]?wave|homekit'."
+          },
+          "keywords": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Seed keywords (max 20)."
+          },
+          "language_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Language constant ID, e.g. '1010' for Dutch. Omit for all languages."
+          },
+          "login_customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional manager customer ID to use as the login-customer-id header."
+          },
+          "max_results": {
+            "default": 200,
+            "description": "Maximum number of ideas returned after filtering and sorting.",
+            "type": "integer"
+          },
+          "min_monthly_searches": {
+            "default": 0,
+            "description": "Drop ideas below this average monthly volume.",
+            "type": "integer"
+          },
+          "network": {
+            "default": "GOOGLE_SEARCH",
+            "description": "GOOGLE_SEARCH (default) or GOOGLE_SEARCH_AND_PARTNERS.",
+            "enum": [
+              "GOOGLE_SEARCH",
+              "GOOGLE_SEARCH_AND_PARTNERS"
+            ],
+            "type": "string"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Seed site/domain, e.g. 'example.com'. Cannot be combined with `keywords` or `url`."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Seed page URL; combined with `keywords` when both are given."
+          }
+        },
+        "required": [
+          "customer_id",
+          "geo_target_ids"
+        ],
+        "type": "object"
+      },
+      "name": "keyword_planner_generate_keyword_ideas",
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Keyword Planner Generate Keyword Ideas"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "Returns search volumes and bid ranges for a known list of keywords (Keyword Planner).\n\nUnlike `generate_keyword_ideas`, this does not suggest new keywords.\nSpelling variants (e.g. 'z wave homekit' and 'z-wave homekit') are\ngrouped into one entry; `close_variants` lists the grouped texts.\nWord-order variants are returned separately but often share one volume.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Google Ads Customer ID (digits or hyphenated)."
+          },
+          "geo_target_ids": {
+            "description": "Geo target constant IDs, e.g. ['2840', '2124'].",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "include_monthly_volumes": {
+            "default": false,
+            "description": "Include the monthly search volume breakdown.",
+            "type": "boolean"
+          },
+          "keywords": {
+            "description": "Keywords to look up.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "language_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Language constant ID, e.g. '1000' for English. Omit for all languages."
+          },
+          "login_customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional manager customer ID to use as the login-customer-id header."
+          },
+          "network": {
+            "default": "GOOGLE_SEARCH",
+            "description": "GOOGLE_SEARCH (default) or GOOGLE_SEARCH_AND_PARTNERS.",
+            "enum": [
+              "GOOGLE_SEARCH",
+              "GOOGLE_SEARCH_AND_PARTNERS"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id",
+          "keywords",
+          "geo_target_ids"
+        ],
+        "type": "object"
+      },
+      "name": "keyword_planner_get_keyword_historical_metrics",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "x-fastmcp-wrap-result": true
+      },
+      "title": "Keyword Planner Get Keyword Historical Metrics"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "description": "Looks up geo target constant IDs by location name, e.g. 'Belgium' -> 2056.\n\nUse the returned `id` values as `geo_target_ids` in the other\nKeyword Planner tools and as location criteria in campaigns.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "country_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional ISO 3166-1 alpha-2 code to restrict matches, e.g. 'CA'."
+          },
+          "locale": {
+            "default": "en",
+            "description": "Language of the names and results, e.g. 'en' or 'nl'.",
+            "type": "string"
+          },
+          "location_names": {
+            "description": "Location names, e.g. ['Belgium', 'Ontario'].",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "login_customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional manager customer ID to use as the login-customer-id header."
+          }
+        },
+        "required": [
+          "location_names"
+        ],
+        "type": "object"
+      },
+      "name": "keyword_planner_suggest_geo_targets",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "x-fastmcp-wrap-result": true
+      },
+      "title": "Keyword Planner Suggest Geo Targets"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Adds, pauses, enables, removes or re-matches keywords in one atomic request.\n\nScope: give exactly one of `ad_group_id` (keywords or, with\n`negative=True`, ad group negatives) or `campaign_id` (campaign negatives\nonly; requires `negative=True`, supports CREATE and REMOVE).\n\nActions per change:\n- CREATE: `text` and `match_type`.\n- PAUSE / ENABLE / REMOVE: `criterion_id` (the keyword's criterion ID).\n- CHANGE_MATCH_TYPE: `criterion_id` and the new `match_type`, optionally a\n  new spelling in `text`. Google Ads cannot change a keyword's match type\n  in place, so this creates the new keyword and pauses the old one.\n\nCheck ideas with `keyword_planner_compare_keyword_ideas` first: it shows\nkeywords that already exist or that negatives would block.\n\nPropose & Confirm Workflow (`validate_only` and `checksum`):\n1. Call `manage_keywords` with `validate_only=True` (the default). After validation passes, the tool returns structured `change_items` and a `checksum` without committing changes.\n2. Present the `change_items` to the user and wait for explicit user approval.\n3. Only after user confirmation, call `manage_keywords` with `validate_only=False` along with the exact same parameters and the `checksum` returned by the previous `validate_only=True` call.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "ad_group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target ad group ID."
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target campaign ID, for campaign negatives."
+          },
+          "changes": {
+            "description": "The changes to apply, e.g. [{\"action\": \"CREATE\", \"text\": \"z-wave hub\", \"match_type\": \"EXACT\"}].",
+            "items": {
+              "description": "One keyword change.\n\nCREATE needs `text` and `match_type`. PAUSE, ENABLE and REMOVE need\n`criterion_id`. CHANGE_MATCH_TYPE needs `criterion_id` and the new\n`match_type`, and optionally a new spelling in `text`.",
+              "properties": {
+                "action": {
+                  "description": "Supported keyword changes.",
+                  "enum": [
+                    "CREATE",
+                    "PAUSE",
+                    "ENABLE",
+                    "REMOVE",
+                    "CHANGE_MATCH_TYPE"
+                  ],
+                  "type": "string"
+                },
+                "criterion_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "match_type": {
+                  "anyOf": [
+                    {
+                      "description": "Keyword match types.",
+                      "enum": [
+                        "EXACT",
+                        "PHRASE",
+                        "BROAD"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "text": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Checksum returned by a prior `validate_only=True` call. Required when `validate_only=False`."
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Google Ads Customer ID (digits or hyphenated)."
+          },
+          "login_customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional manager customer ID to use as the login-customer-id header."
+          },
+          "negative": {
+            "default": false,
+            "description": "True to manage negative keywords.",
+            "type": "boolean"
+          },
+          "validate_only": {
+            "default": true,
+            "description": "If True (default), validates and returns proposed `change_items` and a `checksum` without changing anything. If False, requires `checksum` from a prior `validate_only=True` call to commit.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "customer_id",
+          "changes"
+        ],
+        "type": "object"
+      },
+      "name": "keywords_manage_keywords",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "x-fastmcp-wrap-result": true
+      },
+      "title": "Keywords Manage Keywords"
+    },
+    {
+      "_meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "annotations": {
         "destructiveHint": true,
         "readOnlyHint": false
       },
