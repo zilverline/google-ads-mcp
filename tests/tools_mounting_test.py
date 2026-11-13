@@ -36,6 +36,7 @@ class TestToolsMounting(unittest.IsolatedAsyncioTestCase):
                     "metadata": True,
                     "labels": True,
                     "assets": True,
+                    "keyword_planner": True,
                 }
             }
         )
@@ -54,6 +55,13 @@ class TestToolsMounting(unittest.IsolatedAsyncioTestCase):
         self.assertIn("labels_manage_label_associations", tool_names)
         self.assertIn("assets_create_asset", tool_names)
         self.assertIn("assets_upload_video_asset", tool_names)
+        self.assertIn("keyword_planner_generate_keyword_ideas", tool_names)
+        self.assertIn(
+            "keyword_planner_get_keyword_historical_metrics", tool_names
+        )
+        self.assertIn("keyword_planner_forecast_keywords", tool_names)
+        self.assertIn("keyword_planner_generate_ad_group_themes", tool_names)
+        self.assertIn("keyword_planner_suggest_geo_targets", tool_names)
 
     @patch("ads_mcp.config.ToolsConfig.load")
     async def test_mounting_disabled_namespaces(self, mock_load):
