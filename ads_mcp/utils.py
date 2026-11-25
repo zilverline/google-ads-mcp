@@ -68,15 +68,64 @@ def is_remote_oauth_mode() -> bool:
     )
 
 
-def format_google_ads_error(ex: GoogleAdsException) -> str:
-    """Formats a GoogleAdsException into a human-readable error message."""
-    error_msgs = [
-        f"Google Ads API Error: {error.message}" for error in ex.failure.errors
-    ]
-    details = "\n".join(error_msgs)
-    if details:
-        return f"Request ID: {ex.request_id}\n{details}"
-    return f"Request ID: {ex.request_id}"
+def _operation_index(error: PbMessage) -> int | None:
+    for element in error.location.field_path_elements:
+        if element.field_name == "operations" and element.HasField("index"):
+            return element.index
+    return None
+
+
+def _enum_name(message: PbMessage, field_name: str) -> str:
+    field = message.DESCRIPTOR.fields_by_name[field_name]
+    value = getattr(message, field_name)
+    return field.enum_type.values_by_number[value].name
+
+
+def _policy_details(error: PbMessage) -> list[str]:
+    lines = []
+    violation = error.details.policy_violation_details
+    if error.details.HasField("policy_violation_details"):
+        policy = violation.external_policy_name or violation.key.policy_name
+        line = f"  Policy: {policy}"
+        if violation.external_policy_description:
+            line += f" - {violation.external_policy_description}"
+        if violation.key.violating_text:
+            line += f"; violating text: '{violation.key.violating_text}'"
+        line += f"; exemptible: {'yes' if violation.is_exemptible else 'no'}"
+        lines.append(line)
+    for entry in error.details.policy_finding_details.policy_topic_entries:
+        lines.append(
+            f"  Policy topic: {entry.topic} ({_enum_name(entry, 'type_')})"
+        )
+    return lines
+
+
+def format_google_ads_error(
+    ex: GoogleAdsException, operation_labels: list[str] | None = None
+) -> str:
+    """Formats a GoogleAdsException into a human-readable error message.
+
+    Args:
+        ex: The exception raised by the Google Ads API.
+        operation_labels: Optional description of each operation in the failed
+            request, in request order, used to name the operation an error
+            refers to.
+    """
+    failure = ex.failure
+    if isinstance(failure, proto.Message):
+        failure = type(failure).pb(failure)
+    lines = [f"Request ID: {ex.request_id}"]
+    for error in failure.errors:
+        prefix = ""
+        index = _operation_index(error)
+        if index is not None:
+            prefix = f"Operation {index + 1}"
+            if operation_labels and index < len(operation_labels):
+                prefix += f" ({operation_labels[index]})"
+            prefix += ": "
+        lines.append(f"Google Ads API Error: {prefix}{error.message}")
+        lines.extend(_policy_details(error))
+    return "\n".join(lines)
 
 
 @contextmanager

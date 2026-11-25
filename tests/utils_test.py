@@ -307,6 +307,89 @@ class TestUtils(unittest.TestCase):
         self.assertIn("Request ID: req-999", formatted)
         self.assertIn("Something went wrong.", formatted)
 
+    def test_format_google_ads_error_policy_violation(self):
+        """Tests that policy details and the failing operation are reported."""
+        from unittest.mock import MagicMock
+        from google.ads.googleads.errors import GoogleAdsException
+        from google.ads.googleads.v25.common.types.policy import (
+            PolicyTopicEntry,
+            PolicyViolationKey,
+        )
+        from google.ads.googleads.v25.enums.types.policy_topic_entry_type import (
+            PolicyTopicEntryTypeEnum,
+        )
+        from google.ads.googleads.v25.errors.types.errors import (
+            ErrorDetails,
+            ErrorLocation,
+            GoogleAdsError,
+            GoogleAdsFailure,
+            PolicyFindingDetails,
+            PolicyViolationDetails,
+        )
+
+        failure = GoogleAdsFailure(
+            errors=[
+                GoogleAdsError(
+                    message="A policy was violated.",
+                    location=ErrorLocation(
+                        field_path_elements=[
+                            ErrorLocation.FieldPathElement(
+                                field_name="operations", index=1
+                            ),
+                            ErrorLocation.FieldPathElement(field_name="create"),
+                        ]
+                    ),
+                    details=ErrorDetails(
+                        policy_violation_details=PolicyViolationDetails(
+                            external_policy_name="Trademarks in keywords",
+                            external_policy_description="Trademark use.",
+                            key=PolicyViolationKey(
+                                policy_name="TRADEMARKS",
+                                violating_text="iphone",
+                            ),
+                            is_exemptible=True,
+                        )
+                    ),
+                ),
+                GoogleAdsError(
+                    message="The resource has been disapproved.",
+                    details=ErrorDetails(
+                        policy_finding_details=PolicyFindingDetails(
+                            policy_topic_entries=[
+                                PolicyTopicEntry(
+                                    topic="TRADEMARKS_IN_AD_TEXT",
+                                    type_=PolicyTopicEntryTypeEnum.PolicyTopicEntryType.PROHIBITED,
+                                )
+                            ]
+                        )
+                    ),
+                ),
+            ]
+        )
+        ex = GoogleAdsException(
+            error=MagicMock(),
+            call=MagicMock(),
+            failure=failure,
+            request_id="req-1",
+        )
+
+        formatted = utils.format_google_ads_error(
+            ex, ["CREATE 'knx app' EXACT", "CREATE 'knx iphone app' EXACT"]
+        )
+
+        self.assertEqual(
+            formatted.splitlines(),
+            [
+                "Request ID: req-1",
+                "Google Ads API Error: Operation 2 (CREATE 'knx iphone app' "
+                "EXACT): A policy was violated.",
+                "  Policy: Trademarks in keywords - Trademark use.; violating "
+                "text: 'iphone'; exemptible: yes",
+                "Google Ads API Error: The resource has been disapproved.",
+                "  Policy topic: TRADEMARKS_IN_AD_TEXT (PROHIBITED)",
+            ],
+        )
+
     def test_get_googleads_service_from_client_attaches_interceptor(self):
         """Tests that get_googleads_service_from_client attaches MCPHeaderInterceptor."""
         from unittest.mock import MagicMock

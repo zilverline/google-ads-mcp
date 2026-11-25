@@ -268,6 +268,7 @@ def manage_keywords(
 
     entity_readable = "Negative keyword" if negative else "Keyword"
     operations = []
+    operation_labels: list[str] = []
     change_items: list[pac.ChangeItem] = []
 
     def create(text: str, match_type: str) -> None:
@@ -281,6 +282,7 @@ def manage_keywords(
         elif scope == "ad_group":
             criterion.status = enums.AdGroupCriterionStatusEnum.ENABLED
         operations.append(operation)
+        operation_labels.append(f"CREATE '{text}' {match_type}")
         change_items.extend(
             pac.build_change_items(
                 operation="CREATE",
@@ -297,6 +299,10 @@ def manage_keywords(
         operation.update_mask.paths.append("status")
         operations.append(operation)
         current = existing[criterion_id]
+        operation_labels.append(
+            f"{status} '{current['text']}' {current['match_type']}, "
+            f"ID {criterion_id}"
+        )
         change_items.extend(
             pac.build_change_items(
                 operation="UPDATE",
@@ -315,6 +321,10 @@ def manage_keywords(
         operation.remove = criterion_resource(criterion_id)
         operations.append(operation)
         current = existing[criterion_id]
+        operation_labels.append(
+            f"REMOVE '{current['text']}' {current['match_type']}, "
+            f"ID {criterion_id}"
+        )
         change_items.extend(
             pac.build_change_items(
                 operation="REMOVE",
@@ -370,13 +380,21 @@ def manage_keywords(
         "changes": [c.model_dump(mode="json") for c in changes],
     }
 
+    def _mutate(validate: bool):
+        request.validate_only = validate
+        try:
+            return mutate(request=request)
+        except GoogleAdsException as exc:
+            raise ToolError(
+                "Failed to manage keywords:\n"
+                + utils.format_google_ads_error(exc, operation_labels)
+            ) from exc
+
     def _validate() -> None:
-        request.validate_only = True
-        mutate(request=request)
+        _mutate(validate=True)
 
     def _commit() -> str:
-        request.validate_only = False
-        response = mutate(request=request)
+        response = _mutate(validate=False)
         ids = [utils.extract_id(r.resource_name) for r in response.results]
         return (
             f"Successfully applied {len(ids)} keyword operations in {scope} "
