@@ -20,6 +20,7 @@ from unittest.mock import MagicMock, patch
 
 from fastmcp.exceptions import ToolError
 from google.ads.googleads.client import GoogleAdsClient
+from google.ads.googleads.errors import GoogleAdsException
 from google.auth.credentials import AnonymousCredentials
 
 from ads_mcp.tools import keywords
@@ -143,6 +144,42 @@ class TestManageKeywords(unittest.TestCase):
         )
         self.assertIn("2 keyword operations", result)
         self.assertIn("200~11, 200~12", result)
+
+    def test_api_errors_name_the_failing_keyword(self):
+        failure = self.client.get_type("GoogleAdsFailure")
+        error = self.client.get_type("GoogleAdsError")
+        error.message = "A policy was violated."
+        error.location.field_path_elements.append(
+            type(error.location).FieldPathElement(
+                field_name="operations", index=1
+            )
+        )
+        violation = error.details.policy_violation_details
+        violation.external_policy_name = "Trademarks in keywords"
+        violation.key.violating_text = "iphone"
+        failure.errors.append(error)
+        self.ad_group_service.mutate_ad_group_criteria.side_effect = (
+            GoogleAdsException(
+                error=None, call=None, failure=failure, request_id="req-1"
+            )
+        )
+        changes = [
+            KeywordChange(action="CREATE", text="knx app", match_type="EXACT"),
+            KeywordChange(
+                action="CREATE", text="knx iphone app", match_type="EXACT"
+            ),
+        ]
+
+        with self.assertRaises(ToolError) as raised:
+            self.propose(changes=changes, ad_group_id="200")
+
+        message = str(raised.exception)
+        self.assertIn(
+            "Operation 2 (CREATE 'knx iphone app' EXACT): A policy was "
+            "violated.",
+            message,
+        )
+        self.assertIn("violating text: 'iphone'", message)
 
     def test_commit_requires_matching_checksum(self):
         changes = [
