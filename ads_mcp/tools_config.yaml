@@ -9,3 +9,5 @@ namespaces:
   metadata: true
   labels: true
   assets: true
+  keyword_planner: true
+  keywords: true

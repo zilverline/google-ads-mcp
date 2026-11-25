@@ -25,6 +25,7 @@ from ads_mcp.coordinator import mcp
 # warning.
 from ads_mcp.resources import (
     discovery,
+    keyword_planner,
     metrics,
     release_notes,
     segments,

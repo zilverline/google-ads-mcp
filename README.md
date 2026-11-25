@@ -21,10 +21,22 @@ to provide several
 - `upload_video_asset`: Uploads a local video file to YouTube via the Google Ads API using a background task so it can be referenced by video assets (supported in local `stdio` mode only).
 - `manage_labels`: Creates, updates, and removes account labels.
 - `manage_label_associations`: Creates and removes label associations on `CAMPAIGN`, `CUSTOMER`, `AD_GROUP`, and `AD_GROUP_CRITERION` resources.
+- `manage_keywords`: Creates, pauses, enables, removes and re-matches keywords, ad group negatives and campaign negatives in one atomic request. Changing a match type creates the new keyword and pauses the old one.
+
+#### Keyword Planner tools (`keyword_planner` namespace, read-only)
+
+These need Basic or Standard API access; Explorer access is rejected.
+
+- `generate_keyword_ideas`: Keyword ideas from seed keywords, a URL or a site, with average monthly searches, competition and top-of-page bid ranges. Filter by minimum volume and a regex, sorted by volume.
+- `get_keyword_historical_metrics`: Search volumes and bid ranges for a known list of keywords.
+- `forecast_keywords`: Forecast clicks, cost, average CPC, conversions and CPA for a set of keywords, budget and bidding strategy, without creating anything.
+- `generate_ad_group_themes`: Suggests which existing ad group each keyword fits.
+- `suggest_geo_targets`: Looks up geo target constant IDs by location name.
+- `compare_keyword_ideas`: Checks keywords against an ad group or campaign: which already exist (ignoring case, spaces and hyphens), which exist elsewhere, and which negatives (ad group, campaign, shared lists, account-level lists) would block them.
 
 ### Propose & Confirm Safety Workflow (Mutate Tools)
 
-All write/mutate tools (`create_asset`, `upload_video_asset`, `manage_labels`, and `manage_label_associations`) enforce a two-step **Propose & Confirm** safety workflow:
+All write/mutate tools (`create_asset`, `upload_video_asset`, `manage_labels`, `manage_label_associations`, and `manage_keywords`) enforce a two-step **Propose & Confirm** safety workflow:
 
 1. **Propose (`validate_only=True`, default)**: Validates the operation (including a Google Ads API `validate_only` dry run where supported) without committing changes, returning human-readable `change_items` and a cryptographic `checksum` bound to the customer ID and parameters.
 2. **Confirm (`validate_only=False`)**: Requires passing the exact same parameters and `customer_id` together with the `checksum` returned in step 1 after explicit user approval. Any missing or mismatched checksum is rejected before mutating the account.
@@ -33,7 +45,7 @@ All write/mutate tools (`create_asset`, `upload_video_asset`, `manage_labels`, a
 
 The Google Ads MCP server uses `tools_config.yaml` to let you selectively enable or disable individual tools or tool categories (namespaces) and customize their namespace prefixes.
 
-A default `tools_config.yaml` with all tools enabled is bundled with the package, so the server works out of the box with no extra setup. For strictly read-only deployments, set `labels: false` and `assets: false` in your `tools_config.yaml`. To customize your installation, the server resolves the configuration in the following order:
+A default `tools_config.yaml` with all tools enabled is bundled with the package, so the server works out of the box with no extra setup. For strictly read-only deployments, set `labels: false`, `assets: false` and `keywords: false` in your `tools_config.yaml`. To customize your installation, the server resolves the configuration in the following order:
 
 1. An explicit path set via the `GOOGLE_ADS_MCP_TOOLS_CONFIG` environment variable.
 2. A `tools_config.yaml` file in the current working directory.
@@ -60,6 +72,7 @@ namespaces:
   # Option 4: Disable write/mutate categories for a strictly read-only server
   labels: false
   assets: false
+  keywords: false
 ```
 
 
@@ -69,6 +82,9 @@ namespaces:
 - `metrics`: Retrieve information about the metrics available for reporting in the Google Ads API.
 - `segments`: Retrieve information about the segments available for reporting in the Google Ads API.
 - `release-notes`: Retrieve the release notes for the latest version of the Google Ads API.
+- `keyword-planner/guide`: How to use the Keyword Planner tools: access requirements, the workflow from ideas to adding keywords, how to read volumes, bids and forecasts, and how negative keywords match.
+- `keyword-planner/languages`: Targetable languages with their language constant IDs (e.g. 1010 Dutch).
+- `keyword-planner/countries`: Countries with their geo target constant IDs (e.g. 2056 Belgium).
 
 ## Notes
 
